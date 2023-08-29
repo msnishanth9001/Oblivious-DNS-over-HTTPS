@@ -2,10 +2,15 @@ import os
 import random
 import struct
 import pyhpke
-from pyhpke import AEADId, CipherSuite, KDFId, KEMId, KEMKey
+from pyhpke import AEADId, CipherSuite, KDFId, KEMId, KEMKey, KEMKeyPair
 import hashlib
 import hmac
 import inspect
+
+import requests
+import http.client
+
+OBLIVIOUS_DOH_CONTENT_TYPE = "application/oblivious-dns-message"
 
 ODOH_VERSION = 0x0001
 ODOH_SECRET_LENGTH = 32
@@ -19,6 +24,7 @@ ODOH_LABEL_RESPONSE = "odoh response".encode()
 ODOH_DEFAULT_KEMID = KEMId.DHKEM_P256_HKDF_SHA256
 ODOH_DEFAULT_KDFID = KDFId.HKDF_SHA256
 ODOH_DEFAULT_AEADID = AEADId.AES128_GCM
+
 
 class ObliviousDoHConfigContents:
     def __init__(self, kemID, kdfID, aeadID, publicKeyBytes):
@@ -39,16 +45,6 @@ def CreateObliviousDoHConfigContents(kemID, kdfID, aeadID, publicKeyBytes):
         raise err
 
     return ObliviousDoHConfigContents(kemID, kdfID, aeadID, publicKeyBytes)
-
-def KeyID(k):
-    suite, err = hpke.AssembleCipherSuite(k.KemID, k.KdfID, k.AeadID)
-    if err != None:
-        return None
-
-    identifiers = struct.pack('>HHHH', k.KemID, k.KdfID, k.AeadID, len(k.PublicKeyBytes))
-    config = identifiers + k.PublicKeyBytes
-    prk = suite.KDF.Extract(None, config)
-    return suite.KDF.Expand(prk, ODOH_LABEL_KEY_ID, suite.AEAD.KeySize())
 
 def Marshal(k):
     identifiers = struct.pack('>HHHH', k.KemID, k.KdfID, k.AeadID, len(k.PublicKeyBytes))
@@ -135,3 +131,124 @@ def UnmarshalObliviousDoHConfigs(buffer):
         offset += configLength + 4
 
     return CreateObliviousDoHConfigs(configs)
+
+class ObliviousDNSMessage:
+    def __init__(self, KeyID, MessageType, EncryptedMessage):
+        self.MessageType = MessageType
+        self.KeyID = KeyID
+        self.EncryptedMessage = EncryptedMessage
+
+class QueryContext:
+    def __init__(self, secret, suite, query, publicKey):
+        self.secret = secret
+        self.suite = suite
+        self.query = query
+        self.publicKey = publicKey
+
+def encodeLengthPrefixedSlice(slice_data):
+    length_prefix = len(slice_data).to_bytes(2, byteorder='big')
+    return length_prefix + bytes(slice_data)
+
+import hmac
+from hashlib import sha256
+
+def Extract(salt, ikm):
+    hash_algorithm = sha256
+    salt_or_zero = salt if salt is not None else bytes([0] * hash_algorithm().digest_size)
+    h = hmac.new(salt_or_zero, msg = ikm, digestmod = hash_algorithm)
+    return h.digest()
+
+def Expand(prk, info, out_len):
+    hash_algorithm=sha256
+    out = bytearray()
+    T = b''
+    i = 1
+    while len(out) < out_len:
+        block = T + info + bytes([i])
+        T = hmac.new(prk, msg = block, digestmod = hash_algorithm).digest()
+        out.extend(T)
+        i += 1
+    return bytes(out[:out_len])
+
+def KeyID(k):
+    suite = CipherSuite.new(k.KemID, k.KdfID, k.AeadID)
+    identifiers = struct.pack('>HHHH', 32, 1, 1, len(k.PublicKeyBytes))
+    config = identifiers + k.PublicKeyBytes
+    return Expand(Extract(None, config), ODOH_LABEL_KEY_ID, 32)
+
+def encrypt_query(dns_message, target_key):
+    kem_id = target_key.KemID
+    kdf_id = target_key.KdfID
+    aead_id = target_key.AeadID
+
+    suite = CipherSuite.new(kem_id, kdf_id, aead_id)
+    #to do add check if valid kem kdf aead.    
+
+    public_key_bytes = target_key.PublicKeyBytes
+
+    pkR = suite.kem.deserialize_public_key(public_key_bytes)
+    #to do add deserialize error.
+
+    ODOH_LABEL_QUERY = b"odoh query"
+    # pk = bytes([185, 46, 17, 18, 250, 114, 197, 242, 103, 162, 108, 19, 198, 60, 27, 109, 217, 188, 162, 172, 51, 238, 166, 178, 244, 219, 225, 2, 92, 42, 229, 74])
+    # sk = bytes([212, 46, 236, 37, 95, 134, 158, 162, 50, 42, 195, 28, 62, 55, 54, 1, 43, 144, 253, 36, 47, 149, 13, 43, 77, 127, 239, 70, 152, 51, 56, 224])
+
+    # pke = suite.kem.deserialize_public_key(pk)
+    # ske = suite.kem.deserialize_private_key(sk)
+    # eks = KEMKeyPair(ske, pke)
+    # enc, sender = suite.create_sender_context(pkR, info=ODOH_LABEL_QUERY, eks=eks)
+
+    enc, sender = suite.create_sender_context(pkR, info=ODOH_LABEL_QUERY)
+
+    keyID = KeyID(target_key)
+    QueryType = 1
+    aad = struct.pack('!BH', QueryType, len(keyID)) + keyID
+
+    encoded_message = encodeLengthPrefixedSlice(dns_message) + encodeLengthPrefixedSlice(bytes())
+
+    ct = sender.seal(encoded_message, aad)
+
+    print(">>>>> == enc is",' '.join(str(byte) for byte in enc))
+    print(">>>>> == ct is",' '.join(str(byte) for byte in ct))
+    print(">>>>> == aad is",' '.join(str(byte) for byte in aad))
+    print(">>>>> == encoded_message is",' '.join(str(byte) for byte in encoded_message))
+    print(">>>>> == keyID is",' '.join(str(byte) for byte in keyID))
+
+    odns_message = ObliviousDNSMessage(
+        MessageType=QueryType.to_bytes(1, byteorder='big'),
+        KeyID=keyID,
+        EncryptedMessage=[item for item in (enc + ct)]
+    )
+
+    query_context = QueryContext(
+        secret=sender._exporter_secret,
+        suite=suite,
+        query=encoded_message,
+        publicKey=target_key
+    )
+
+    return odns_message, query_context
+
+def create_odoh_question(dns_message, public_key):
+    # print(">>>>> == create_odoh_question has dns_message", dns_message)
+    return encrypt_query(dns_message, public_key)
+
+def prepareHttpRequest(Query):
+    url = "odoh.cloudflare-dns.com"
+
+    headers = {
+        'accept': OBLIVIOUS_DOH_CONTENT_TYPE,
+        'content-type': OBLIVIOUS_DOH_CONTENT_TYPE
+    }
+
+    odoh_endpoint = "https://odoh.cloudflare-dns.com/dns-query"
+
+    serialized_odns_message = Query.MessageType + encodeLengthPrefixedSlice(Query.KeyID) + encodeLengthPrefixedSlice(Query.EncryptedMessage)
+
+    # print(serialized_odns_message)
+
+    response = requests.post(odoh_endpoint, data=serialized_odns_message, headers=headers)
+    
+    print(">>>>> == dns_query_Packed is",' '.join(str(byte) for byte in serialized_odns_message))
+
+    print(response)
