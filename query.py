@@ -8,7 +8,7 @@ import socket
 # domain is odoh target.
 # ask the resolver for target's conf.
 
-# odoh_target = "www.svcb_example.com" 
+# odoh_target = "odoh.dns_resolver.com" 
 # resolver = "10.0.0.35"
 
 response = odoh.Fetch_Configs()
