@@ -8,11 +8,11 @@ import socket
 # domain is odoh target.
 # ask the resolver for target's conf.
 
-# odoh_target = "odoh.dns_resolver.com" 
-# resolver = "10.0.0.35"
+odoh_target = "odoh.dns_resolver.com" 
+resolver = "10.0.0.35"
 
-response = odoh.Fetch_Configs()
-#response = odoh.SVCB_DNS_Request(odoh_target, resolver, dns.rdatatype.SVCB)
+#response = odoh.Fetch_Configs()
+response = odoh.SVCB_DNS_Request(odoh_target, resolver, "SVCB")
 
 # send request to Param url=""
 # default is cloudflare server.

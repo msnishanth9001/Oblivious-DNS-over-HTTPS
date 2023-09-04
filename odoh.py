@@ -99,7 +99,8 @@ def SVCB_DNS_Request(domain_name: str, resolver: str, RType: dns.rdatatype):
 
     # Create a DNS request for (SVCB/ HTTPS)
     qname = dns.name.from_text(domain_name)
-    response = dns.resolver.resolve(qname, rdtype=dns.rdatatype.SVCB)
+
+    response = dns.resolver.resolve(qname, RType)
     answer = response.rrset
 
     # Parse the ANSWER Section and extract odohconfig value.
