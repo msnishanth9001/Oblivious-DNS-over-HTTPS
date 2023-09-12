@@ -90,17 +90,18 @@ The information received from the fetch request's content in byte representation
 <br /><u>Note 2</u>. The ObliviousDoHConfig can have multiple ObliviousDoHConfigContents. In this example there is only one structure of ObliviousDoHConfigContents.
 
 byte structure when parsed (in-order):
-<br />&nbsp;  2B - [0 44] is the length of the message stream of odoh_config.
-<br />&nbsp;  2B - [0  &nbsp; 1] is the version of odoh_config.
-<br />&nbsp;  2B - [0 40] is the length of the structure ObliviousDoHConfigContents from the odoh rfc.
-<br />&nbsp; 2B - [0 32] is the enum value of kem_id corresponding to the KEM from algorigthm the hpke rfc.
-<br />&nbsp; 2B - [0 &nbsp; 1] is the enum value of kdf_id corresponding to the KDF from algorigthm the hpke rfc.
-<br />&nbsp; 2B - [0 &nbsp; 1] is the enum value of aead_id corresponding to the AEAD algorigthm from the hpke rfc.
-<br />&nbsp; 2B - [0 32] is the length of the public_key in ObliviousDoHConfigContents.
-<br />32B - [...]is the public_key in ObliviousDoHConfigContents.
+<br />&nbsp;  2B - [0 &nbsp;44] is the length of the message stream of odoh_config.
+<br />&nbsp;  2B - [0  &nbsp;&nbsp;&nbsp; 1] is the version of odoh_config.
+<br />&nbsp;  2B - [0 &nbsp;40] is the length of the structure ObliviousDoHConfigContents from the odoh rfc.
+<br />&nbsp; 2B - [0 &nbsp;32] is the enum value of kem_id corresponding to the KEM from algorigthm the hpke rfc.
+<br />&nbsp; 2B - [0 &nbsp;&nbsp;&nbsp; 1] is the enum value of kdf_id corresponding to the KDF from algorigthm the hpke rfc.
+<br />&nbsp; 2B - [0 &nbsp;&nbsp;&nbsp; 1] is the enum value of aead_id corresponding to the AEAD algorigthm from the hpke rfc.
+<br />&nbsp; 2B - [0 &nbsp;32] is the length of the public_key in ObliviousDoHConfigContents.
+<br />32B - [93..4] is the public_key in ObliviousDoHConfigContents.
 
 
-### 4. Construct the ObliviousDoHConfig as,
+### 4. ObliviousDoHConfig
+Rearrange the data to Construct the ObliviousDoHConfig as,
 ```
    struct {
       enum kem_id  = 32 // DHKEM(X25519,HKDF-SHA256);
@@ -110,81 +111,123 @@ byte structure when parsed (in-order):
    }
 ```
 
-### 5. Create a DNS question of the domain and type of RR to look for. 
+### 5. DNS question
+Create a DNS question for the domain to look and add the type of RR to look for.
+<br />Here it is ```www.cloudfare``` with ```AAAA``` RR.<br />
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; opcode: QUERY, status: NOERROR, id: 62411
-;; flags: rd; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;<br />
+;; opcode: QUERY, status: NOERROR, id: 62411<br />
+;; flags: rd; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0<br />
 
-;; QUESTION SECTION:
-;www.cloudflare.com. IN  AAAA
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; QUESTION SECTION:<br />
+;www.cloudflare.com. IN  AAAA<br />
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;<br />
+
+<br />
+Transform DNS question to byte stream.
+<br />byte representation is,
+<br />[243 203 1 0 0 1 0 0 0 0 0 0 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1]
 
 
-5. Transform DNS question to byte stream.
-byte representation:
-[243 203 1 0 0 1 0 0 0 0 0 0 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1]
+### 6. Add padding,
+To The DNS question add padding data.<br />
+&nbsp;&nbsp;&nbsp;&nbsp;- here padding is 0B.
 
-
-6. Add padding,
-      - here padding is 0B.
-byte representation:
+byte representation:<br />
 [[243 203 1 0 0 1 0 0 0 0 0 0 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1][]]
 
 
-7. Encode this DNS Question
-- by adding byte information to capture length of the message.
-- Using this the parser will know how many bytes of message and how many bytes of padding exists.
+### 7. Encode this DNS Question
+- Add byte information to capture length of the message.
+- This byte information will help parser know how many bytes of message and how many bytes of padding exists.
 - Length is captured in 2B.
+- Here 36 is the length of the DNS Question.
+- Here 0 is the length of the DNS padding.
 
-byte representation:
-the DNS Message will be [0 36 243 203 1 0 0 1 0 0 0 0 0 0 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1]
-The padding Message will be [0 0]
+the DNS Message will be<br />[0 36 243 203 1 0 0 1 0 0 0 0 0 0 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1]
+<br /><br />
+The padding Message will be<br /> [0 0]
 
 The encoded_message, [[0 36 243 203 1 0 0 1 0 0 0 0 0 0 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1] [0 0]]
 
-8. ephemeral keys
+### 8. 
+
+shared_secret, enc = encap(pkr, sks, eks)
+
+generates a shared secret value and an “encapsulation” (a ciphertext) of this secret value.
+
+pkr the Public key, of server to connect with.
+sks the private key of the client.
+eks the ephemeral key pair of the client.
+
+psk_id is b""
+info is label b""
+
+labeled_expand() IS ...
+
+psk_id_hash = labeled_extract of [b"", b"psk_id_hash", psk_id]
+info_hash = kdf.labeled_extract of [b"", b"info_hash", info]
+key_schedule_context = bytes([mode.value]) + psk_id_hash + info_hash
+
+key = kdf.labeled_expand(secret, b"key", key_schedule_context, self._aead.key_size)
+base_nonce = kdf.labeled_expand(secret, b"base_nonce", key_schedule_context, self._aead.nonce_size)
+exporter_secret = kdf.labeled_expand(secret, b"exp", key_schedule_context, kdf.digest_size)
+aad =  QueryType, len(keyID) + keyID
+
+
+context_secret = sender.export(bytes(ODOH_LABEL_RESPONSE), suite.aead.key_size)
+    labeled_expand(self._exporter_secret, b"sec", exporter_context, length)
+
+
+ct = sender.seal(encoded_DNSmessage, aad)
+
+### 9. SetupBaseS
+ephemeral key pair, description
 - short lived keys, of small size.
 - these keys are used as part of the Asymmetric cryptography.
-- input ikm, Input Keying Material OR Salt. Random Generated.
-- DeriveKeyPair(ikm) with algo is X25519() with label "odoh query"
+- take ikm as input (Input Keying Material OR Salt). Random Generated.
+- DeriveKeyPair(ikm) with algo as X25519(). Here label is "odoh query".
 
-- secret is depends on the hpke_MODE SetupBaseS() here it is, Encap(rand, pkR)
-- ExporterSecret is a derivative of LabeledExpand() on secret with label "exp"
+- secret is depends on the hpke_MODE SetupBaseS() here it is, Encap(rand, pkR).
+- ExporterSecret is a derivative of LabeledExpand() on secret with label "exp".
 - context_secret is a derivative of LabeledExpand() on ExporterSecret "odoh response"
 
 byte representation:
+<br /><u>pkE</u>
+<br />[185 46 17 18 250 114 197 242 103 162 108 19 198 60 27 109 217 188 162 172 51 238 166 178 244 219 225 2 92 42 229 74]
+<br /><u>skE</u>
+<br />[212 46 236 37 95 134 158 162 50 42 195 28 62 55 54 1 43 144 253 36 47 149 13 43 77 127 239 70 152 51 56 224]
+<br /><u>secret</u> 
+<br />[209 55 114 215 25 255 30 91 74 149 36 178 169 23 10 38 73 243 82 29 90 213 83 55 192 227 49 187 43 94 146 167]
+<br /><u>ExporterSecret</u>
+<br />[146 254 159 8 154 183 38 156 157 197 4 239 80 120 205 70 97 153 146 81 193 2 189 69 170 37 170 32 18 124 224 89]
+<br /><u>context_secret</u>
+<br />[8 96 214 85 206 203 91 140 60 57 56 240 109 106 63 99]
+<br /><u>enc</u>
+<br />[185 46 17 18 250 114 197 242 103 162 108 19 198 60 27 109 217 188 162 172 51 238 166 178 244 219 225 2 92 42 229 74]
 
-pkE [185 46 17 18 250 114 197 242 103 162 108 19 198 60 27 109 217 188 162 172 51 238 166 178 244 219 225 2 92 42 229 74]
-skE [212 46 236 37 95 134 158 162 50 42 195 28 62 55 54 1 43 144 253 36 47 149 13 43 77 127 239 70 152 51 56 224]
-
-secret [209 55 114 215 25 255 30 91 74 149 36 178 169 23 10 38 73 243 82 29 90 213 83 55 192 227 49 187 43 94 146 167]
-ExporterSecret [146 254 159 8 154 183 38 156 157 197 4 239 80 120 205 70 97 153 146 81 193 2 189 69 170 37 170 32 18 124 224 89]
-context_secret is [8 96 214 85 206 203 91 140 60 57 56 240 109 106 63 99]
-enc is [185 46 17 18 250 114 197 242 103 162 108 19 198 60 27 109 217 188 162 172 51 238 166 178 244 219 225 2 92 42 229 74]
-
-9. KeyID()
+### 9. KeyID
 
 -computed by Extract(Expand(odoh_config, ODOH_LABEL_KEY_ID))
 
-byte representation:
-keyID is [174 61 228 158 138 72 229 161 140 196 100 87 24 161 73 118 245 106 213 72 111 199 184 149 49 197 51 65 166 145 14 137]
+keyID is,
+<br />[174 61 228 158 138 72 229 161 140 196 100 87 24 161 73 118 245 106 213 72 111 199 184 149 49 197 51 65 166 145 14 137]
 
-10. AAD
+### 10. AAD
 - AAD, Associated Data. Commonly used to provide context, metadata, or other information that needs to be associated with the encrypted message.
 - Calculated as,
 aad = QueryType + len(keyID)) + keyID
 
-byte representation:
-aad, [1 0 32 174 61 228 158 138 72 229 161 140 196 100 87 24 161 73 118 245 106 213 72 111 199 184 149 49 197 51 65 166 145 14 137]
+aad is,
+<br />[1 0 32 174 61 228 158 138 72 229 161 140 196 100 87 24 161 73 118 245 106 213 72 111 199 184 149 49 197 51 65 166 145 14 137]
 
-11. Cipher Text [ct]
+### 11. Cipher Text [ct]
 ct = sender.seal(encoded_message, aad)
 
 byte representation:
-[236 61 78 158 127 234 51 100 237 45 186 211 239 138 234 59 248 156 8 37 203 190 230 29 37 206 226 245 
-14 130 241 244 107 157 191 136 207 73 57 168 132 70 8 177 30 149 252 83 120 220 217 227 18 241 44 146]
-12. odns_message
+<br />[236 61 78 158 127 234 51 100 237 45 186 211 239 138 234 59 248 156 8 37 203 190 230 29 37 206 226 245 14 130 241 244 107 157 191 136 207 73 57 168 132 70 8 177 30 149 252 83 120 220 217 227 18 241 44 146]
+
+### 12. odns_message
 -The encrypted Oblivious DNS Question as message to odoh target.
 -This structure is packed as,
 
@@ -197,6 +240,7 @@ ObliviousDNSMessage(
 MessageType is an Identifier to distinguish, if the ObliviousDNSMessage is a Response or a Question. This is packed in 1B.
 encrypted_message is [enc + ct]
 byte representation:
+```
 ObliviousDNSMessage {
     1,
     [174 61 228 158 138 72 229 161 140 196 100 87 24 161 73 118 245 106 213 72 111 199 184 149 49 197 51 65 166 145 14 137],
@@ -204,59 +248,61 @@ ObliviousDNSMessage {
         42 229 74 236 61 78 158 127 234 51 100 237 45 186 211 239 138 234 59 248 156 8 37 203 190 230 29 37 206 226 
         245 14 130 241 244 107 157 191 136 207 73 57 168 132 70 8 177 30 149 252 83 120 220 217 227 18 241 44 146]
 }
+```
 
 
-13. query_context
+### 13. query_context
 
+```
 query_context = QueryContext(
 	secret : context_secret,
 	suite: suite (kem, kdf, aead),
 	query : encoded_DNSmessage,
 	publicKey : target_key
 )
+```
 
+### 14. Prepare HTTP Request
 
-14. Prepare HTTP Request
-
+```
 odoh_endpoint="https://odoh.cloudflare-dns.com/dns-query"
 
- headers = {
-'accept': OBLIVIOUS_DOH_CONTENT_TYPE,
-'content-type': OBLIVIOUS_DOH_CONTENT_TYPE
+headers = {
+    'accept': OBLIVIOUS_DOH_CONTENT_TYPE,
+    'content-type': OBLIVIOUS_DOH_CONTENT_TYPE
 }
+```
 
+### 15. serialize ObliviousDNSMessage
 
-15. serialize ObliviousDNSMessage
-
+```
 ObliviousDNSMessage (
 	KeyID,
 	MessageType,
 	encrypted_message
 }
+```
 
- serialized_odns_message : [messageType + [length(KeyID) + KeyID] + [length(EncryptedMessage) + EncryptedMessage]]
+
+```serialized_odns_message : [messageType + [length(KeyID) + KeyID] + [length(EncryptedMessage) + EncryptedMessage]]```
 
 
-16. ODOH Request
+### 16. ODOH Request
 
 with headers and serialized_odns_message
 
 
-17. ODOH Response
+### 17. ODOH Response
 
 byte representation:
-[2 [141 228 110 38 172 167 92 201 39 250 141 186 205 65 63 250] [162 111 25 142 99 129 126
-41 209 88 214 193 148 115 43 167 149 244 222 173 198 35 215 11 11 186 102 54 188 126 30 232
-147 29 55 10 35 121 136 175 25 183 71 158 11 91 137 58 169 243 80 218 219 247 28 210 185 95
-116 47 75 158 4 57 90 71 162 94 215 70 183 45 6 99 186 38 103 102 205 26 100 96 47 134 35 224 
-67 72 121 116 171 220 142 102 112 220 106 54 40 199 8 196 47 16 173 121 55 93 234 122 157 20]]
+<br />[2 [141 228 110 38 172 167 92 201 39 250 141 186 205 65 63 250] [162 111 25 142 99 129 126 41 209 88 214 193 148 115 43 167 149 244 222 173 198 35 215 11 11 186 102 54 188 126 30 232 147 29 55 10 35 121 136 175 25 183 71 158 11 91 137 58 169 243 80 218 219 247 28 210 185 95 116 47 75 158 4 57 90 71 162 94 215 70 183 45 6 99 186 38 103 102 205 26 100 96 47 134 35 224 67 72 121 116 171 220 142 102 112 220 106 54 40 199 8 196 47 16 173 121 55 93 234 122 157 20]]
 
   1B is message_type
   16B is key_id
 [...] is encrypted_message = byte_response[21:]
 
 
-18. HPKE computations 
+### 18. HPKE computations 
 
 byte representation:
 encoded_response_nonce :[len(KeyID) + KeyID]
@@ -292,7 +338,7 @@ pt : [0 92 243 203 129 128 0 1 0 2 0 0 0 0 3 119 119 119 10 99 108 111 117 100 1
  0B is padding
 
 
-19. DNS Answer
+### 19. DNS Answer
 
  >> ODoH Resolution
 

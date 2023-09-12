@@ -11,8 +11,10 @@ import socket
 odoh_target = "odoh.dns_resolver.com" 
 resolver = "10.0.0.35"
 
-#response = odoh.Fetch_Configs()
-response = odoh.SVCB_DNS_Request(odoh_target, resolver, "SVCB")
+response = odoh.Fetch_Configs()
+dnssec = 1
+edns = 1
+# response = odoh.SVCB_DNS_Request(odoh_target, resolver, "SVCB")
 
 # send request to Param url=""
 # default is cloudflare server.
@@ -27,8 +29,10 @@ odoh_config = odoh_configs.Configs[0]
 # domain is the domain to locate.
 domain_name = "www.cloudflare.com"
 dns_type = "AAAA"  #28
-dns_query = dns.message.make_query(domain_name, dns_type)
+dns_query = dns.message.make_query(domain_name, dns_type, dnssec, edns)
 query_data = dns_query.to_wire()
+
+print(dns_query)
 
 # Step 4 Construct Oblivious DNS Message
 odohQuery, queryContext = odoh.CreateOdohQuestion(query_data, odoh_config.Contents)
