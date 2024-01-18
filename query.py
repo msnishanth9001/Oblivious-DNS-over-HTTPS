@@ -1,83 +1,40 @@
+import sys
 import odoh
-import requests
 
-import dns.resolver
-import socket
+def main():
+    if len(sys.argv) != 7:
+        print("Usage: python query.py arg1 arg2 arg3 arg4 arg5 arg6")
+        return
 
-### Service Discovery Method selection
-# domain is odoh target.
-# ask the resolver for target's conf.
+    """
+    resolver = "1.1.1.1"
+    ddr/ odoh_target = "odoh.cloudflare-dns.com"
+    ddrType = SVCB/ HTTPS
+    http_method = POST/ GET
 
-odoh_target = "odoh.dns_resolver.com" 
-resolver = "10.0.0.35"
+    lookup_domain = "www.github.com"
+    lookup_domain_rr_type = A
+    """
 
-response = odoh.Fetch_Configs()
-dnssec = 1
-edns = 1
-# response = odoh.SVCB_DNS_Request(odoh_target, resolver, "SVCB")
+    resolver = sys.argv[1]
+    ddr = sys.argv[2]
+    ddrType = sys.argv[3]
+    http_method = sys.argv[4]
+    lookup_domain = sys.argv[5]
+    lookup_domain_rr_type = sys.argv[6]
 
-# send request to Param url=""
-# default is cloudflare server.
-response = odoh.Fetch_Configs()
+    print("Resolver:", resolver)
+    print("ODOH Target:", ddr)
+    print("HTTP Method:", http_method)
+    print("Query Domain:", lookup_domain)
+    print("Query_RR Type:", lookup_domain_rr_type)
 
-# Step 2 parsing the ODoH Config
-odoh_configs = odoh.UnmarshalObliviousDoHConfigs(response)
-odoh_config = odoh_configs.Configs[0]
-# print("ODoH Config",' '.join(str(byte) for byte in response))
+    dns_response = odoh.dns_odoh(ddr, ddrType, resolver, http_method, lookup_domain, lookup_domain_rr_type)
 
-# Step 3 Construct DNS Message
-# domain is the domain to locate.
-domain_name = "www.cloudflare.com"
-dns_type = "AAAA"  #28
-dns_query = dns.message.make_query(domain_name, dns_type, dnssec, edns)
-query_data = dns_query.to_wire()
+    print("DNS Answer via ODOH: ", dns_response)
 
-print(dns_query)
+if __name__ == "__main__":
+    main()
 
-# Step 4 Construct Oblivious DNS Message
-odohQuery, queryContext = odoh.CreateOdohQuestion(query_data, odoh_config.Contents)
 
-# Step 5 Construct ODNS Message
-# default Param odoh_endpoint set to cloudflare.
-response = odoh.PrepareHTTPrequest(odohQuery)
-
-# Step 6 Parse the ODNS Response
-dns_message = odoh.ValidateEncryptedResponse(response.content, queryContext)
-
-print("\n >> ODoH Resolution\n")
-if dns_message:
-    print("Header:")
-    print("ID:", dns_message.id)
-
-    if hasattr(dns_message, "opcode"):
-        print("Opcode:", dns_message.opcode())
-
-    if hasattr(dns_message, "rcode"):
-        print("RCODE:", dns_message.rcode())
-
-    if hasattr(dns_message, "rd"):
-        print("RD:", dns_message.rd())
-
-    if hasattr(dns_message, "ra"):
-        print("RA:", dns_message.ra())
-
-    if hasattr(dns_message, "ad"):
-        print("AD:", dns_message.ad())
-
-    if hasattr(dns_message, "cd"):
-        print("CD:", dns_message.cd())
-
-    print("\nQuestions:")
-    for question in dns_message.question:
-        print("Name:", question.name)
-        print("Qtype:", question.rdtype)
-        print("Qclass:", question.rdclass)
-
-    print("\nAnswers:")
-    for answer in dns_message.answer:
-        print("Name:", answer.name)
-        print("Type:", answer.rdtype)
-        print("Class:", answer.rdclass)
-        print("TTL:", answer.ttl)
-        print("Data:", answer.to_text())
 

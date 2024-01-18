@@ -202,6 +202,77 @@ def KeyID(suite, k):
     config = identifiers + k.PublicKeyBytes
     return Expand(Extract(None, config), ODOH_LABEL_KEY_ID, suite.kdf._hash.digest_size)
 
+def setup_query_context_and_decrypt_query_body(skR, Q_encrypted):
+    # enc || ct = Q_encrypted
+    # context = SetupBaseR(enc, skR, "odoh query")
+    # return context
+
+    # aad = 0x01 || len(key_id) || key_id()
+    # enc_32 || ct_: = Q_encrypted
+    # Q_plain, error = context.Open(aad, ct)
+    # return Q_plain, error
+
+    suite = hpke.CipherSuite.new(KEM_ID, KDF_ID, AEAD_ID)
+    enc = bytes([185, 46, 17, 18, 250, 114, 197, 242, 103, 162, 108, 19, 198, 60, 27, 109, 217, 188, 162, 172, 51, 238, 166, 178, 244, 219, 225, 2, 92, 42, 229, 74])
+    ct = bytes([25, 101, 45, 19, 59, 117, 84, 232, 226, 13, 20, 182, 224, 47, 17, 100, 78, 132, 198, 196, 33, 216, 130, 38, 72, 135, 97, 226, 100, 147, 27, 224, 0, 53, 207, 159, 8, 224, 252, 207, 111, 122, 189, 42, 171, 225, 201, 180, 26, 118, 88, 51, 64, 23, 209, 12, 185, 242, 104, 135, 160, 173, 88, 158, 192, 142, 163])
+
+    skR = suite.kem.deserialize_private_key(skR)
+    keyID = bytes([144, 226, 65, 36, 10, 25, 155, 155, 247, 46, 33, 148, 34, 218, 75, 234, 187, 234, 206, 177, 56, 132, 55, 87, 104, 149, 242, 144, 196, 228, 69, 142])
+
+    context_R = suite.create_recipient_context(enc, skR, info=b"odoh query")
+    aad = struct.pack('!BH', QueryType, len(keyID)) + keyID
+    pt = context_R.open(ct=ct, aad=aad)
+
+    #print(">>>BIGIP: DNS Query/ PT",pt)
+    return pt, context_R
+
+def derive_secrets(context_R, Q_plain, resp_nonce):
+    # secret = context.Export("odoh response", Nk)
+    # salt = Q_plain || len(resp_nonce) || resp_nonce
+    # prk = Extract(salt, secret)
+    # key = Expand(odoh_prk, "odoh key", Nk)
+    # nonce = Expand(odoh_prk, "odoh nonce", Nn)
+    # return key, nonce
+
+    secret = context_R.export(bytes(ODOH_LABEL_RESPONSE), 16)
+    #print(">>>BIGIP: secret",' '.join(str(byte) for byte in secret))
+    salt = Q_plain + struct.pack('!H', len(resp_nonce)) + resp_nonce
+    prk = Extract(salt, secret)
+    key = Expand(prk, b"odoh key", 32)
+    nonce = Expand(prk, b"odoh nonce", 16)
+    return key, nonce
+
+# def func (ctx *SenderContext) Seal(aad, pt []byte) []byte {
+#     ct = ctx.aead.Seal(nil, ctx.computeNonce(), pt, aad)
+#     ctx.incrementSeq()
+#     return ct
+
+def encrypt_response_body(R_plain, aead_key, aead_nonce, resp_nonce, context_R):
+    # aad = 0x02 || len(resp_nonce) || resp_nonce
+    # R_encrypted = Seal(aead_key, aead_nonce, aad, R_plain)
+    # return R_encrypted
+
+    aad = struct.pack('!BH', ResponseType, len(resp_nonce)) + resp_nonce
+    cipher = AESGCM(aead_key)
+    ct = cipher.encrypt(resp_nonce, R_plain, aad)
+    return ct
+
+def packet_parser(skR, Q_encrypted):
+    pt, context_R = setup_query_context_and_decrypt_query_body(skR, Q_encrypted)
+
+    resp_nonce = bytes([222, 51, 96, 30, 102, 20, 18, 29, 25, 120, 74, 38, 201, 43, 147, 144])
+    key, nonce = derive_secrets(context_R, pt, resp_nonce)
+
+    dns_resp_plain = "194 127 129 128 0 1 0 2 0 0 0 1 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1 192 12 0 28 0 1 0 0 0 134 0 16 38 6 71 0 0 0 0 0 0 0 0 0 104 16 123 96 192 12 0 28 0 1 0 0 0 134 0 16 38 6 71 0 0 0 0 0 0 0 0 0 104 16 124 96 0 0 41 4 208 0 0 0 0 0 0"
+    dns_resp_plain = dns_resp_plain.replace(" ", ",")
+    dns_resp_plain = ast.literal_eval("[" + dns_resp_plain + "]")
+    dns_resp_plain = bytes(dns_resp_plain)
+
+    aead_key = key
+    aead_nonce = 0
+    R_encrypted = encrypt_response_body(dns_resp_plain, aead_key, aead_nonce, resp_nonce, context_R)
+    return R_encrypted
+
 def EncryptQuery(encoded_DNSmessage, target_key):
     kem_id = target_key.KemID
     kdf_id = target_key.KdfID
@@ -215,7 +286,7 @@ def EncryptQuery(encoded_DNSmessage, target_key):
     public_key_bytes = target_key.PublicKeyBytes
     pkR = suite.kem.deserialize_public_key(public_key_bytes)
 
-    # # Custom ephemeral keys (self)
+    # Custom ephemeral keys (self)
     # pk = bytes([185, 46, 17, 18, 250, 114, 197, 242, 103, 162, 108, 19, 198, 60, 27, 109, 217, 188, 162, 172, 51, 238, 166, 178, 244, 219, 225, 2, 92, 42, 229, 74])
     # sk = bytes([212, 46, 236, 37, 95, 134, 158, 162, 50, 42, 195, 28, 62, 55, 54, 1, 43, 144, 253, 36, 47, 149, 13, 43, 77, 127, 239, 70, 152, 51, 56, 224])
     # pke = suite.kem.deserialize_public_key(pk)
@@ -239,7 +310,7 @@ def EncryptQuery(encoded_DNSmessage, target_key):
         KeyID=keyID,
         EncryptedMessage=[item for item in (enc + ct)]
     )
-    return odns_message, query_context
+    return odns_message, query_context, target_key
 
 def CreateOdohQuestion(dns_message, public_key):
     encoded_DNSmessage = EncodeLengthPrefixedSlice(dns_message) + EncodeLengthPrefixedSlice(bytes(ODOH_PADDING_BYTE))
@@ -251,8 +322,13 @@ def PrepareHTTPrequest(Query, odoh_endpoint="https://odoh.cloudflare-dns.com/dns
         'content-type': OBLIVIOUS_DOH_CONTENT_TYPE
     }
     serialized_odns_message = Query.MessageType + EncodeLengthPrefixedSlice(Query.KeyID) + EncodeLengthPrefixedSlice(Query.EncryptedMessage)
+
+    ##### debug
+    skR = bytes([8, 120, 144, 255, 254, 254, 129, 120, 36, 39, 171, 179, 221, 119, 77, 215, 171, 236, 247, 81, 39, 186, 240, 59, 225, 108, 189, 81, 136, 60, 71, 133])
+    R_encrypted = packet_parser(skR, serialized_odns_message)
+
     response = requests.post(odoh_endpoint, data=serialized_odns_message, headers=headers)
-    return response
+    return response, R_encrypted
 
 def DecryptResponse(response, query_context):
     responseNonceSize = query_context.suite.aead.key_size
@@ -273,7 +349,6 @@ def DecryptResponse(response, query_context):
     cipher = AESGCM(key)
     plaintext = cipher.decrypt(nonce, bytes(response.EncryptedMessage), aad)
     return plaintext
-
 
 def UnmarshalMessageBody(data):
     if len(data) < 2:
@@ -311,7 +386,6 @@ def OpenAnswer(response, query_context):
     else:
         print("packet marshalling gone wrong")
         sys.exit(1)
-
     return decrypted_response
 
 def ParseDNSresponse(response):
@@ -319,26 +393,26 @@ def ParseDNSresponse(response):
     return dns_message
 
 def ValidateEncryptedResponse(byte_response, query_context):
-    message_type = byte_response[0:1]
-    key_id = byte_response[3:19]
-    encrypted_message = byte_response[21:]
-
     # for desired ODOH response, the custom way to
     # parse the response. Please ensure you are
     # using cusom ephemeral keys at EncryptQuery()
     # OR if you have CT bytes, pass string below.
 
-    # odoh_response_string = "93 43 25 186 226 48 127 13 234 126 169 136 98 67 98 9] [252 78 107 222 175 15 149 246 237 93 237 253 82 207 183 68 28 107 204 219 99 69 21 147 135 158 207 168 230 252 81 182 2 58 158 250 152 136 45 62 215 69 53 211 28 65 12 62 16 38 144 164 144 204 203 232 114 29 67 149 63 231 61 76 177 87 217 180 152 142 156 218 27 118 215 205 75 213 69 9 99 46 163 9 201 103 239 232 228 52 86 85 11 4 79 31 63 216 244 232 178 114 207 30 170 58 194 124 138 144 235 42"
+    # message_type = byte_response[0:1]
+    # key_id = byte_response[3:19]
+    # encrypted_message = byte_response[21:]
 
-    # lists = odoh_response_string.split("] [")
-    # modified_string = lists[0].replace(" ", ",")
-    # key_id = ast.literal_eval("[" + modified_string + "]")
-    # modified_string = lists[1].replace(" ", ",")
-    # encrypted_message = ast.literal_eval("[" + modified_string + "]")
+    # modified_string = "2 0 16 160 65 176 97 97 38 47 147 137 25 73 129 40 73 130 232 0 123 43 57 42 50 95 127 87 22 109 40 68 49 100 226 68 167 86 48 192 122 161 1 100 226 57 92 171 42 152 136 88 86 186 172 252 33 215 139 166 167 195 229 223 107 191 225 148 37 14 138 163 193 63 9 248 178 162 128 199 141 215 9 8 206 27 148 213 5 188 28 89 210 92 140 43 43 71 162 101 67 36 5 120 100 230 69 1 209 81 183 166 53 24 142 119 24 30 218 22 65 152 142 42 251 205 156 57 29 153 135 248 90 112 255 232 183 245 72 243 137 28 28 47"
+    # modified_string = modified_string.replace(" ", ",")
+    # byte_response = ast.literal_eval("[" + modified_string + "]")
 
-    # ct = "0 36 157 63 1 0 0 1 0 0 0 0 0 0 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1 0 0"
-    # modified_string = ct.replace(" ", ",")
+    # modified_string = "0 47 92 240 1 0 0 1 0 0 0 0 0 1 3 119 119 119 10 99 108 111 117 100 102 108 97 114 101 3 99 111 109 0 0 28 0 1 0 0 41 4 208 0 1 0 0 0 0 0 0"
+    # modified_string = modified_string.replace(" ", ",")
     # query_context.query = ast.literal_eval("[" + modified_string + "]")
+
+    message_type = byte_response[0:1]
+    key_id = byte_response[3:19]
+    encrypted_message = byte_response[21:]
 
     response = ObliviousDNSMessage(key_id, message_type, encrypted_message)
     decrypted_response = OpenAnswer(response, query_context)
