@@ -30,6 +30,8 @@
 
 # Overview of ODoH
 
+to do add PIC
+
 |  |       Step       |                 Actions                                                                                                                                               |
 |------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1    | Fetch ODoH Configs  | A DNS Request is done to fetch HTTPS RR, which contains the odohconfig.                                                                                        |
