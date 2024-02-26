@@ -8,6 +8,7 @@ import struct
 import requests
 import ipaddress
 import subprocess
+import validators
 import dns.resolver
 import pyhpke as hpke
 import dns.rdtypes.svcbbase as svcb_helper
@@ -706,18 +707,20 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, http_method, doma
         else:
             url = odoh_ddr
         response = Fetch_Configs(url)
-        odoh_target_ip = 'odoh.cloudflare-dns.com'
+        odoh_address = ' https://odoh.cloudflare-dns.com/dns-query'
+
     elif configFetch_method.upper() == "DNS":
-        response, odoh_target_ip = SVCB_DNS_Request(odoh_ddr, resolver, ddrRType)
+        response, odoh_address = SVCB_DNS_Request(odoh_ddr, resolver, ddrRType)
         if not response:
             return None, None, None, None, None
-        if not odoh_target_ip:
+        if not odoh_address:
             print("Additional Section empty. Client won't perform ODOH. Ensure WideIP minimal-response is Disabled.")
             return None, None, None, None, None
     else:
         print("un-defined configFetch_method")
 
     # print("odohconfig", ' '.join(str(byte) for byte in response))
+
     # Step 2 parsing the ODoH Config
     try:
         odoh_configs = UnmarshalObliviousDoHConfigs(response)
@@ -725,7 +728,7 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, http_method, doma
     except:
         return None, None, None, None, None
 
-    _svcb_ansIP = odoh_target_ip
+    _svcb_ansIP = odoh_address
 
     # Step 3 Construct DNS Message
     print(f" -- Constructing DNS Query for ODOH, [domain {domain_name} RR Type {rr_type}]." +
@@ -743,13 +746,15 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, http_method, doma
 
     # Step 5 Sending ODNS Question
 
-    odoh_endpoint = 'https://' + odoh_target_ip + '/'
+    if validators.url(url):
+        odoh_endpoint = odoh_address
 
-    ip_obj = ipaddress.ip_address(odoh_target_ip)
-    if ip_obj.version == 4:
-        odoh_endpoint = 'https://' + str(odoh_target_ip)
-    elif ip_obj.version == 6:
-        odoh_endpoint = 'https://[' + str(odoh_target_ip) + ']'
+    else:
+        ip_obj = ipaddress.ip_address(odoh_address)
+        if ip_obj.version == 4:
+            odoh_endpoint = 'https://' + str(odoh_address)
+        elif ip_obj.version == 6:
+            odoh_endpoint = 'https://[' + str(odoh_address) + ']'
 
     print(f" -- Sending ODOH request to \"{odoh_endpoint}\"")
     response = PrepareHTTPrequest(odohQuery, http_method, odoh_endpoint)
