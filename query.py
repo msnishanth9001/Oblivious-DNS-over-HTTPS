@@ -1,70 +1,53 @@
 import sys
 import odoh
+import argparse
 
 def main():
-    if sys.argv[1].upper() == 'DNS':
-        if len(sys.argv) != 8:
-            print("Usage: python query.py arg1 arg2 arg3 arg4 arg5 arg6 arg7")
-            return
-        else:
-            configFetch_method = sys.argv[1]
-            resolver = sys.argv[2]
-            ddr = sys.argv[3]
-            ddrType = sys.argv[4]
-            http_method = sys.argv[5]
-            lookup_domain = sys.argv[6]
-            lookup_domain_rr_type = sys.argv[7]
 
-            dns_response = odoh.dns_odoh(ddr, configFetch_method, ddrType, resolver, http_method, lookup_domain, lookup_domain_rr_type)
+    # python3 query.py --odohconfig url --target www.google.com --dnstype a
 
-    elif sys.argv[1].upper() == 'URL':
-        if len(sys.argv) != 6:
-            print("Usage: python query.py arg1 arg2 arg3 arg4 arg5")
-            return
-        else:
-            configFetch_method = sys.argv[1]
-            ddr = sys.argv[2]
-            http_method = sys.argv[3]
-            lookup_domain = sys.argv[4]
-            lookup_domain_rr_type = sys.argv[5]
+    # python3 query.py --odohconfig dns --ldns 10.0.0.4 --ddr odoh.f5-dns.com --ddrtype svcb --target dns.answer.com --dnstype a
 
-            dns_response = odoh.dns_odoh(ddr, configFetch_method, '', '', http_method, lookup_domain, lookup_domain_rr_type)
+    parser = argparse.ArgumentParser(description='Process some commands.')
 
-    """
-    python3 rquery.py 10.0.0.4 odoh.f5-dns.com svcb POST dns.answer.com a
+    # Common arguments
+    parser.add_argument('--odohconfig', type=str.upper, choices=['URL', 'DNS'], help='Method to use', required=True)
+    parser.add_argument('--target', help='Target address', required=True)
+    parser.add_argument('--dnstype', type=str.upper, help='DNS Type', required=True)
+    parser.add_argument('--httpmethod', type=str.upper, default='POST', help='DNS Type')
 
-    resolver = "1.1.1.1"
-    ddr/ odoh_target = "odoh.cloudflare-dns.com"
-    ddrType = SVCB/ HTTPS
-    http_method = POST/ GET
+    # URL specific arguments
+    url_group = parser.add_argument_group('URL Specific Arguments')
+    url_group.add_argument('--odohhost', help='Local DNS server')
 
-    lookup_domain = "www.github.com"
-    lookup_domain_rr_type = A
+    # DNS specific arguments
+    dns_group = parser.add_argument_group('DNS Specific Arguments')
+    url_group.add_argument('--ddr', help='DDR: odoh.cloudflare-dns.com')
+    url_group.add_argument('--ddrtype', help='DDR RR Type: SVCB RR/ HTTPS RR')
+    dns_group.add_argument('--ldns', default='default', help='Local DNS server')
 
-    resolver = sys.argv[1]
-    configFetch_method = sys.argv[2]
-    ddr = sys.argv[3]
-    ddrType = sys.argv[4]
-    http_method = sys.argv[5]
-    lookup_domain = sys.argv[6]
-    lookup_domain_rr_type = sys.argv[7]
+    args = parser.parse_args()
 
-    print("Resolver:", resolver)
-    print("configFetch_method", configFetch_method)
-    print("ODOH Target/ URL:", ddr)
-    print("ddrType:", ddrType)
-    print("HTTP Method:", http_method)
-    print("Query Domain:", lookup_domain)
-    print("Query_RR Type:", lookup_domain_rr_type)
+    # Now you can access the arguments using args.method, args.target, args.dnstype, args.ldns, args.ddr, args.ddrtype
 
-    dns_response = odoh.dns_odoh(ddr, ddrType, resolver, http_method, lookup_domain, lookup_domain_rr_type)
-    """
+    if args.odohconfig == 'DNS':
+        if (args.odohhost):
+            print("Error ODOH-DNS method: Unsupported Arguments passed.")
+            sys.exit(1)
 
-    print("DNS Answer via ODOH: ", dns_response)
+        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.httpmethod, args.target, args.dnstype)
+
+    if args.odohconfig == 'URL':
+        if (args.ddr or args.ddrtype):
+            print("Error ODOH-URL method: Unsupported Arguments passed.")
+            sys.exit(1)
+
+        dns_response = odoh.dns_odoh(args.odohhost, args.odohconfig, '', '', args.httpmethod, args.target, args.dnstype)
+
+
+    # print("DNS Answer via ODOH: ", dns_response)
 
 if __name__ == "__main__":
     main()
-
-
 
 

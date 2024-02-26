@@ -698,15 +698,15 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, http_method, doma
     _odoh_ansIP: This is IP from SVCB Response.
     _svcb_ansIP: This is IP from  ODOH Response.
     """
-    
 
     # Step1 Service Discovery Method selection
     if configFetch_method.upper() == "URL":
-        if odoh_ddr.upper() == "DEFAULT":
-            url = 'https://odoh.cloudflare-dns.com/.well-known/odohconfigs'
-        else:
+        if odoh_ddr:
             url = odoh_ddr
+        else:
+            url = 'https://odoh.cloudflare-dns.com/.well-known/odohconfigs'
         response = Fetch_Configs(url)
+        print(" -- GOT ODOHCONFIGS")
         odoh_address = ' https://odoh.cloudflare-dns.com/dns-query'
 
     elif configFetch_method.upper() == "DNS":
