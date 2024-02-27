@@ -15,10 +15,10 @@ def main():
     parser.add_argument('--target', help='Target address', required=True)
     parser.add_argument('--dnstype', type=str.upper, help='DNS Type', required=True)
     parser.add_argument('--httpmethod', type=str.upper, default='POST', help='DNS Type')
+    parser.add_argument('--odohhost', default=None, help='odohhost address')
 
     # URL specific arguments
     url_group = parser.add_argument_group('URL Specific Arguments')
-    url_group.add_argument('--odohhost', help='Local DNS server')
 
     # DNS specific arguments
     dns_group = parser.add_argument_group('DNS Specific Arguments')
@@ -26,23 +26,22 @@ def main():
     url_group.add_argument('--ddrtype', help='DDR RR Type: SVCB RR/ HTTPS RR')
     dns_group.add_argument('--ldns', default='default', help='Local DNS server')
 
-    args = parser.parse_args()
-
     # Now you can access the arguments using args.method, args.target, args.dnstype, args.ldns, args.ddr, args.ddrtype
+    args = parser.parse_args()
 
     if args.odohconfig == 'DNS':
         if (args.odohhost):
             print("Error ODOH-DNS method: Unsupported Arguments passed.")
             sys.exit(1)
 
-        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.httpmethod, args.target, args.dnstype)
+        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.odohhost, args.httpmethod, args.target, args.dnstype)
 
     if args.odohconfig == 'URL':
         if (args.ddr or args.ddrtype):
             print("Error ODOH-URL method: Unsupported Arguments passed.")
             sys.exit(1)
 
-        dns_response = odoh.dns_odoh(args.odohhost, args.odohconfig, '', '', args.httpmethod, args.target, args.dnstype)
+        dns_response = odoh.dns_odoh(args.odohhost, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype)
 
 
     # print("DNS Answer via ODOH: ", dns_response)

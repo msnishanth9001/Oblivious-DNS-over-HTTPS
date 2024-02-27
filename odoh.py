@@ -92,24 +92,16 @@ def Fetch_Configs(url):
     url -- url where odoh config is hosted.
     """
 
+    print(f" -- Fetching ODOH-Config from: {url}")
     response = requests.get(url)
     if response.status_code == 200:
         byte_data = response.content
-        byte_integers = [byte for byte in byte_data]
+        # byte_integers = [byte for byte in byte_data]
     else:
         print(f"Request failed with status code {response.status_code}")
     return response.content
 
-# Method_2 to fetch odoh configs By DNS request over socket
-def SVCB_DNS_bySocket(domain_name: str, resolver: str, RType: str):
-    forward_addr = (resolver, 53) # dns and port
-    client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    q = DNSRecord.question(domain_name, RType)
-    client.sendto(bytes(q.pack()), forward_addr)
-    data, _ = client.recvfrom(1024)
-    return data[-46:]
-
-# Method_3 to fetch odoh configs By DNS request
+# Method_2 to fetch odoh configs By DNS request
 def SVCB_DNS_Request(domain_name: str, resolver: str, ddrRType: dns.rdatatype):
     """
     returns the odoh_config retrieved from the DNS request.
@@ -502,7 +494,7 @@ def PrepareHTTPrequest(Query, http_method, odoh_endpoint="https://odoh.cloudflar
     serialized_odns_message = Query.MessageType + EncodeLengthPrefixedSlice(Query.KeyID) + EncodeLengthPrefixedSlice(Query.EncryptedMessage)
 
     try:
-        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+        # requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         if http_method.upper() == "POST":
             response = requests.post(odoh_endpoint, data=serialized_odns_message, headers=headers, verify=False, timeout=3)
         if http_method.upper() == "GET":
@@ -685,7 +677,7 @@ def dns_answerParser(dns_message):
     print(" -- No RRSET in Encrypted DNS response from ODOH server - [EMPTY DNS RESPONSE]")
     return None, rcode.to_text(dns_message.rcode())
 
-def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, http_method, domain_name, rr_type, dns_queryid=0, edns=False):
+def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_method, domain_name, rr_type, dns_queryid=0, edns=False):
     """
     odoh_ddr: domain of odoh target.
     ddrRType: RR Type of the odoh target HTTPS/ SVCB.
@@ -701,24 +693,19 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, http_method, doma
 
     # Step1 Service Discovery Method selection
     if configFetch_method.upper() == "URL":
-        if odoh_ddr:
-            url = odoh_ddr
-        else:
-            url = 'https://odoh.cloudflare-dns.com/.well-known/odohconfigs'
-        response = Fetch_Configs(url)
-        print(" -- GOT ODOHCONFIGS")
+        if not odohhost:
+            odohhost = 'https://odoh.cloudflare-dns.com/.well-known/odohconfigs'
+        response = Fetch_Configs(odohhost)
         odoh_address = ' https://odoh.cloudflare-dns.com/dns-query'
 
     elif configFetch_method.upper() == "DNS":
         response, odoh_address = SVCB_DNS_Request(odoh_ddr, resolver, ddrRType)
-        if not response:
-            return None, None, None, None, None
-        if not odoh_address:
-            print("Additional Section empty. Client won't perform ODOH. Ensure WideIP minimal-response is Disabled.")
+        if not response or not (odoh_address or odohhost):
             return None, None, None, None, None
     else:
         print("un-defined configFetch_method")
 
+    print(" -- Recieved ODOH-Config")
     # print("odohconfig", ' '.join(str(byte) for byte in response))
 
     # Step 2 parsing the ODoH Config
@@ -746,8 +733,8 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, http_method, doma
 
     # Step 5 Sending ODNS Question
 
-    if validators.url(url):
-        odoh_endpoint = odoh_address
+    if validators.url(odohhost):
+        odoh_endpoint = odohhost
 
     else:
         ip_obj = ipaddress.ip_address(odoh_address)
