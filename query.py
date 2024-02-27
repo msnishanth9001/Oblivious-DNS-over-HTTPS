@@ -17,7 +17,9 @@ def main():
     parser.add_argument('--ddr', help='DDR: odoh.cloudflare-dns.com')
     parser.add_argument('--httpmethod', type=str.upper, default='POST', help='DNS Type')
     parser.add_argument('--odohhost', default=None, help='odohhost address')
-    parser.add_argument('-v', '--verbose', default=0, help='verbose')
+    parser.add_argument('--getconfig',  action=argparse.BooleanOptionalAction, help='log odohConfig')
+    parser.add_argument('-v', '--verbose',  action=argparse.BooleanOptionalAction, help='verbose')
+
 
     # URL specific arguments
     url_group = parser.add_argument_group('URL Specific Arguments')
@@ -27,7 +29,6 @@ def main():
     url_group.add_argument('--ddrtype', help='DDR RR Type: SVCB RR/ HTTPS RR')
     dns_group.add_argument('--ldns', default='default', help='Local DNS server')
 
-    # Now you can access the arguments using args.method, args.target, args.dnstype, args.ldns, args.ddr, args.ddrtype
     args = parser.parse_args()
 
     if args.odohconfig == 'DNS':
@@ -35,17 +36,14 @@ def main():
             print("Error ODOH-DNS method: Unsupported Arguments passed.")
             sys.exit(1)
 
-        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.odohhost, args.httpmethod, args.target, args.dnstype, args.v)
+        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.odohhost, args.httpmethod, args.target, args.dnstype, args.v, args.getconfig)
 
     if args.odohconfig == 'URL':
         if (args.ddr or args.ddrtype):
             print("Error ODOH-URL method: Unsupported Arguments passed.")
             sys.exit(1)
 
-        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose)
-
-
-    # print("DNS Answer via ODOH: ", dns_response)
+        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose, args.getconfig)
 
 if __name__ == "__main__":
     main()

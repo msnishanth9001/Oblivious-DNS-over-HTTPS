@@ -93,7 +93,7 @@ def Fetch_Configs(url, v):
     url -- url where odoh config is hosted.
     """
 
-    if v == 'log':
+    if v:
         print(f" -- Fetch ODOH-Config from: {url}")
     response = requests.get(url)
     if response.status_code == 200:
@@ -118,7 +118,7 @@ def SVCB_DNS_Request(domain_name: str, resolver: str, ddrRType: dns.rdatatype, v
     dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
     dns.resolver.default_resolver.nameservers = [resolver]
 
-    if v == 'log':
+    if v:
         print(f" -- DNS domain Look up for {domain_name} with resolver {resolver} for rtype {ddrRType}")
 
     # Create a DNS request for (SVCB/ HTTPS)
@@ -496,7 +496,7 @@ def PrepareHTTPrequest(Query, http_method, v, odoh_endpoint="https://odoh.cloudf
         }
     serialized_odns_message = Query.MessageType + EncodeLengthPrefixedSlice(Query.KeyID) + EncodeLengthPrefixedSlice(Query.EncryptedMessage)
 
-    if v == 'log':
+    if v:
         print("Warning: this is an Insecure HTTPS Request. Adding certificate verification is strongly advised for deployment.")
 
     try:
@@ -766,7 +766,7 @@ def dns_answerParser(dns_message):
     print(" -- No RRSET in Encrypted DNS response from ODOH server - [EMPTY DNS RESPONSE]")
     return None, rcode.to_text(dns_message.rcode())
 
-def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_method, domain_name, rr_type, v, dns_queryid=0, edns=False):
+def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_method, domain_name, rr_type, v, odohconfigF, dns_queryid=0, edns=False):
     """
     odoh_ddr: domain of odoh target.
     ddrRType: RR Type of the odoh target HTTPS/ SVCB.
@@ -779,6 +779,10 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
     _odoh_ansIP: This is IP from SVCB Response.
     _svcb_ansIP: This is IP from  ODOH Response.
     """
+
+    if odohhost and not validators.url(odohhost):
+        print(f"{odohhost} is a valid url.")
+        return
 
     # Step1 Service Discovery Method selection
     if configFetch_method.upper() == "URL":
@@ -800,10 +804,10 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
     else:
         print("un-defined configFetch_method")
 
-    if v == 'log':
+    if v:
         print(" -- Parsed odohconfigs.")
 
-    if v == 'odohconfig':
+    if odohconfigF:
         print("odohConfig:", ' '.join(str(byte) for byte in response))
         return
 
@@ -815,7 +819,7 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
         return None, None, None, None, None
 
     # Step 3 Construct DNS Message
-    if v == 'log':
+    if v:
         print(f" -- Constructing DNS Query for ODOH. [domain: {domain_name} RR-Type: {rr_type}]." +
           (f"QueryID: {dns_queryid}" if dns_queryid else "") +
           (f" EDNS: {edns}." if edns else ""))
@@ -841,14 +845,14 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
         elif ip_obj.version == 6:
             odoh_endpoint = 'https://[' + str(odohhost) + ']'
 
-    if v == 'log':
+    if v:
         print(f" -- Sending ODOH request to: {odoh_endpoint}.")
 
     response = PrepareHTTPrequest(odohQuery, http_method, v, odoh_endpoint)
 
     if response is not None:
         headers_list = dict(response.headers)
-        if v == 'log':
+        if v:
             print(" -- Recieved ODOH Response \n") #, headers_list, response.content)
 
         if response.status_code == 200:
