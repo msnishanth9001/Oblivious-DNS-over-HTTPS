@@ -13,8 +13,9 @@ import dns.resolver
 import pyhpke as hpke
 import dns.rdtypes.svcbbase as svcb_helper
 
-from hashlib import sha256
+from dns import rcode
 from time import sleep
+from hashlib import sha256
 from urllib3.exceptions import InsecureRequestWarning
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -493,8 +494,10 @@ def PrepareHTTPrequest(Query, http_method, odoh_endpoint="https://odoh.cloudflar
         }
     serialized_odns_message = Query.MessageType + EncodeLengthPrefixedSlice(Query.KeyID) + EncodeLengthPrefixedSlice(Query.EncryptedMessage)
 
+    print("Warning: this is an Insecure HTTPS Request. Adding certificate verification is strongly advised for deployment.")
+
     try:
-        # requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         if http_method.upper() == "POST":
             response = requests.post(odoh_endpoint, data=serialized_odns_message, headers=headers, verify=False, timeout=3)
         if http_method.upper() == "GET":
@@ -656,23 +659,106 @@ def ValidateEncryptedResponse(byte_response, query_context):
         return err
     return dns_bytes
 
+def parse_dns_message(dns_message):
+    lines = dns_message.strip().split('\n')
+    formatted_messages = []
+
+    while lines:
+        message = {}
+        line = lines.pop(0).strip()
+        message["id"] = line.split()[1]
+
+        line = lines.pop(0).strip()
+        message["opcode"] = line.split()[1]
+        message["rcode"] = line.split()[3]
+
+        flags = line.split()[5:]
+        message["flags"] = ' '.join(flags)
+
+        question_section = []
+        while True:
+            line = lines.pop(0).strip()
+            if line.startswith(";QUESTION"):
+                break
+            question_section.append(line)
+        message["QUESTION"] = question_section
+
+        answer_section = []
+        while True:
+            line = lines.pop(0).strip()
+            if line.startswith(";ANSWER"):
+                break
+            answer_section.append(line)
+        message["ANSWER"] = answer_section
+
+        formatted_messages.append(message)
+
+    return formatted_messages
+
+
+def print_pretty_dns(messages):
+    for message in messages:
+        print("msg ;; opcode: {}, status: {}, id: {}".format(message["opcode"], message["rcode"], message["id"]))
+        print(";; flags: {}; QUERY: {}, ANSWER: {}, AUTHORITY: {}, ADDITIONAL: {}".format(
+            message["flags"], len(message["QUESTION"]), len(message["ANSWER"]), 0, 0))
+
+        print("\n;; QUESTION SECTION:")
+        for q in message["QUESTION"]:
+            print(q)
+
+        print("\n;; ANSWER SECTION:")
+        for a in message["ANSWER"]:
+            print(a)
+
+        print("\n>>>>> == dnsResponse is ;; opcode: {}, status: {}, id: {}".format(
+            message["opcode"], message["rcode"], message["id"]))
+        print(";; flags: {}; QUERY: {}, ANSWER: {}, AUTHORITY: {}, ADDITIONAL: {}".format(
+            message["flags"], len(message["QUESTION"]), len(message["ANSWER"]), 0, 0))
+
+        print("\n;; QUESTION SECTION:")
+        for q in message["QUESTION"]:
+            print(q)
+
+        print("\n;; ANSWER SECTION:")
+        for a in message["ANSWER"]:
+            print(a)
+        print()
+
+
 def dns_answerParser(dns_message):
     """
-    addl section is not handled. This is expecting
     terminal RR Types as requested RRType.
     """
-    ans_list = []
-    answers = []
 
-    from dns import message, rcode
+    dns_response_data = dns_message.to_wire()
+    dns_response = dns.message.from_wire(dns_response_data)
 
-    for rr in dns_message.answer:
-        answers.append(str(rr))
-        ans_list.append(rr.to_text().split()[-1])
+    print(">>>>> == dnsResponse is ;; opcode: QUERY, status: NOERROR, id:", dns_response.id)
+    print(";; flags: qr rd ra; QUERY: {}, ANSWER: {}, AUTHORITY: {}, ADDITIONAL: {}".format(
+        len(dns_response.question), len(dns_response.answer), len(dns_response.authority), len(dns_response.additional)))
 
-    if ans_list:
-        print(" -- Encrypted DNS response from ODOH server", answers)
-        return ans_list[0], rcode.to_text(dns_message.rcode())
+    print("\n;; QUESTION SECTION:")
+    for question in dns_response.question:
+        print(question)
+
+    print("\n;; ANSWER SECTION:")
+    for answer in dns_response.answer:
+        print(answer)
+
+    print("\n;; AUTHORITY SECTION:")
+    for authority in dns_response.authority:
+        print(authority)
+
+    print("\n;; ADDITIONAL SECTION:")
+
+    print("\n")
+
+    for additional in dns_response.additional:
+        print(additional)
+
+    dns_answer = ((dns_message.answer)[0]).to_text().split("\n")
+    if dns_answer:
+        return dns_answer[0], rcode.to_text(dns_message.rcode())
 
     print(" -- No RRSET in Encrypted DNS response from ODOH server - [EMPTY DNS RESPONSE]")
     return None, rcode.to_text(dns_message.rcode())
@@ -693,14 +779,20 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
 
     # Step1 Service Discovery Method selection
     if configFetch_method.upper() == "URL":
-        if not odohhost:
-            odohhost = 'https://odoh.cloudflare-dns.com/.well-known/odohconfigs'
-        response = Fetch_Configs(odohhost)
-        odoh_address = ' https://odoh.cloudflare-dns.com/dns-query'
+        if not odoh_ddr:
+            odoh_ddr = 'https://odoh.cloudflare-dns.com/.well-known/odohconfigs'
+        response = Fetch_Configs(odoh_ddr)
+        odohhost = 'https://odoh.cloudflare-dns.com/dns-query'
+    
+    # to do add odohhost validation.
 
     elif configFetch_method.upper() == "DNS":
-        response, odoh_address = SVCB_DNS_Request(odoh_ddr, resolver, ddrRType)
-        if not response or not (odoh_address or odohhost):
+        response,  odohhost= SVCB_DNS_Request(odoh_ddr, resolver, ddrRType)
+        if not response:
+            print(" -- Unable to Fetch ODOH-Config via DNS Resolution.")
+            return None, None, None, None, None
+        if not (odohhost):
+            print(" -- ODOH Host is UnKNOWN. Cannot Proceed for ODOH Resolution.")
             return None, None, None, None, None
     else:
         print("un-defined configFetch_method")
@@ -715,10 +807,8 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
     except:
         return None, None, None, None, None
 
-    _svcb_ansIP = odoh_address
-
     # Step 3 Construct DNS Message
-    print(f" -- Constructing DNS Query for ODOH, [domain {domain_name} RR Type {rr_type}]." +
+    print(f" -- Constructing DNS Query for ODOH. [domain: {domain_name} RR-Type: {rr_type}]." +
           (f"QueryID: {dns_queryid}" if dns_queryid else "") +
           (f" EDNS: {edns}." if edns else ""))
 
@@ -737,13 +827,15 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
         odoh_endpoint = odohhost
 
     else:
-        ip_obj = ipaddress.ip_address(odoh_address)
+        print("not url", odohhost)
+        ip_obj = ipaddress.ip_address(odohhost)
         if ip_obj.version == 4:
-            odoh_endpoint = 'https://' + str(odoh_address)
+            odoh_endpoint = 'https://' + str(odohhost)
         elif ip_obj.version == 6:
-            odoh_endpoint = 'https://[' + str(odoh_address) + ']'
+            odoh_endpoint = 'https://[' + str(odohhost) + ']'
 
-    print(f" -- Sending ODOH request to \"{odoh_endpoint}\"")
+    print(f" -- Sending ODOH request to: {odoh_endpoint}.")
+
     response = PrepareHTTPrequest(odohQuery, http_method, odoh_endpoint)
 
     if response is not None:
@@ -756,10 +848,10 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
 
             # Step 7 parse dns answer
             _odoh_ansIP, dns_rcode = dns_answerParser(dns_message)
-            return _svcb_ansIP, _odoh_ansIP, response.status_code, dns_rcode, headers_list
+            return odohhost, _odoh_ansIP, response.status_code, dns_rcode, headers_list
 
         else:
-            return _svcb_ansIP, response, response.status_code, None, headers_list
+            return odohhost, response, response.status_code, None, headers_list
 
     """
     In case of DNS NXDomain or ErrCode. All DNS Answers are in DNS wire format.
@@ -771,5 +863,5 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
     """
 
     print(" -- No response from ODOH Server")
-    return _svcb_ansIP, None, None, None, None
+    return odohhost, None, None, None, None
 

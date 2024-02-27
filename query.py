@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--odohconfig', type=str.upper, choices=['URL', 'DNS'], help='Method to use', required=True)
     parser.add_argument('--target', help='Target address', required=True)
     parser.add_argument('--dnstype', type=str.upper, help='DNS Type', required=True)
+    parser.add_argument('--ddr', help='DDR: odoh.cloudflare-dns.com')
     parser.add_argument('--httpmethod', type=str.upper, default='POST', help='DNS Type')
     parser.add_argument('--odohhost', default=None, help='odohhost address')
 
@@ -22,7 +23,6 @@ def main():
 
     # DNS specific arguments
     dns_group = parser.add_argument_group('DNS Specific Arguments')
-    url_group.add_argument('--ddr', help='DDR: odoh.cloudflare-dns.com')
     url_group.add_argument('--ddrtype', help='DDR RR Type: SVCB RR/ HTTPS RR')
     dns_group.add_argument('--ldns', default='default', help='Local DNS server')
 
@@ -41,7 +41,7 @@ def main():
             print("Error ODOH-URL method: Unsupported Arguments passed.")
             sys.exit(1)
 
-        dns_response = odoh.dns_odoh(args.odohhost, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype)
+        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype)
 
 
     # print("DNS Answer via ODOH: ", dns_response)
