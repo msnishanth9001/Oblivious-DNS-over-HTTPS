@@ -27,9 +27,3 @@ python3 query.py --odohconfig url --target odoh.cloudflare-dns.com --dnstype aaa
 ```sh
 python3 query.py --odohconfig dns --ldns 10.0.0.4 --ddr odoh.f5-dns.com --ddrtype svcb --target dns.answer.com --dnstype aaaa --getconfig -v
 ```
-
-### Note
-
-> This tool includes a sub command for benchmarking various protocols and has been
-> used for performing measurements presented in this [arxiv paper](https://arxiv.org/abs/2011.10121). There are also
-> traces of telemetry which are used for the same purpose in an effort to reproduce the results of the paper.
