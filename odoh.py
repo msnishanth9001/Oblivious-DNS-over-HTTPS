@@ -661,7 +661,7 @@ def ValidateEncryptedResponse(byte_response, query_context):
         print("unable to parse_dns_response")
         return err
     return dns_bytes
-    
+
 
 def print_pretty_dns(messages):
     for message in messages:
@@ -696,7 +696,7 @@ def dns_answerParser(dns_message):
     dns_response_data = dns_message.to_wire()
     dns_response = dns.message.from_wire(dns_response_data)
 
-    print(";; ->>HEADER<<- opcode: opcode: QUERY, status: NOERROR, id:", dns_response.id)
+    print("\n;; ->>HEADER<<- opcode: opcode: QUERY, status: NOERROR, id:", dns_response.id)
     print(";; flags: qr rd ra; QUERY: {}, ANSWER: {}, AUTHORITY: {}, ADDITIONAL: {}".format(
         len(dns_response.question), len(dns_response.answer), len(dns_response.authority), len(dns_response.additional)))
 
@@ -796,7 +796,6 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
         odoh_endpoint = odohhost
 
     else:
-        print("not url", odohhost)
         ip_obj = ipaddress.ip_address(odohhost)
         if ip_obj.version == 4:
             odoh_endpoint = 'https://' + str(odohhost)
@@ -811,7 +810,7 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
     if response is not None:
         headers_list = dict(response.headers)
         if v:
-            print(" -- Recieved ODOH Response \n") #, headers_list, response.content)
+            print(" -- Recieved ODOH Response") #, headers_list, response.content)
 
         if response.status_code == 200:
             # Step 6 Parse/ Validated/ Decrypt the ODNS Response
