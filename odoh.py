@@ -696,6 +696,9 @@ def dns_answerParser(dns_message):
     dns_response_data = dns_message.to_wire()
     dns_response = dns.message.from_wire(dns_response_data)
 
+    if not dns_message.answer:
+        print("\n -- No RRSET in Encrypted DNS response from ODOH server - [EMPTY DNS RESPONSE]")
+
     print("\n;; ->>HEADER<<- opcode: opcode: QUERY, status: NOERROR, id:", dns_response.id)
     print(";; flags: qr rd ra; QUERY: {}, ANSWER: {}, AUTHORITY: {}, ADDITIONAL: {}".format(
         len(dns_response.question), len(dns_response.answer), len(dns_response.authority), len(dns_response.additional)))
@@ -713,18 +716,15 @@ def dns_answerParser(dns_message):
         print(authority)
 
     print("\n;; ADDITIONAL SECTION:")
-
-    print("\n")
-
     for additional in dns_response.additional:
         print(additional)
+    print("\n")
+    
+    if not dns_message.answer:
+        return None, rcode.to_text(dns_message.rcode())
 
-    if dns_message.answer:
-        dns_answer = ((dns_message.answer)[0]).to_text().split("\n")
-        return dns_answer[0], rcode.to_text(dns_message.rcode())
-
-    print(" -- No RRSET in Encrypted DNS response from ODOH server - [EMPTY DNS RESPONSE]")
-    return None, rcode.to_text(dns_message.rcode())
+    dns_answer = ((dns_message.answer)[0]).to_text().split("\n")
+    return dns_answer[0], rcode.to_text(dns_message.rcode())
 
 def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_method, domain_name, rr_type, v, odohconfigF, dns_queryid=0, edns=False):
     """
