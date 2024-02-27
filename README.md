@@ -19,7 +19,7 @@ python3 query.py --odohconfig dns --ldns 10.0.0.4 --ddr odoh.f5-dns.com --ddrtyp
 ### ODoH query to target VIA URL for odohConfig
 
 ```sh
-python3 query.py --odohconfig url --target odoh.cloudflare-dns.com --dnstype aaaa -v
+python3 query.py --odohconfig url --target odoh.cloudflare-dns.com --dnstype aaaa
 ```
 
 ### Fetch ODoH configuration
