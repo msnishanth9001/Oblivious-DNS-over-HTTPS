@@ -5,7 +5,7 @@ ODoH allows hiding client IP addresses via proxying encrypted DNS transactions. 
 It currently supports the following functionalities:
 
 - [ ] DoH Query:
-- [x] ODoH Query: `odoh-client odoh --domain www.cloudflare.com. --dnstype AAAA --target <target>`
+- [x] ODoH Query:
 - [ ] ODoH Query via Proxy:
 
 ## Usage
