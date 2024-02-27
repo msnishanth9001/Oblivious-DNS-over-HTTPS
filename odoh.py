@@ -661,43 +661,7 @@ def ValidateEncryptedResponse(byte_response, query_context):
         print("unable to parse_dns_response")
         return err
     return dns_bytes
-
-def parse_dns_message(dns_message):
-    lines = dns_message.strip().split('\n')
-    formatted_messages = []
-
-    while lines:
-        message = {}
-        line = lines.pop(0).strip()
-        message["id"] = line.split()[1]
-
-        line = lines.pop(0).strip()
-        message["opcode"] = line.split()[1]
-        message["rcode"] = line.split()[3]
-
-        flags = line.split()[5:]
-        message["flags"] = ' '.join(flags)
-
-        question_section = []
-        while True:
-            line = lines.pop(0).strip()
-            if line.startswith(";QUESTION"):
-                break
-            question_section.append(line)
-        message["QUESTION"] = question_section
-
-        answer_section = []
-        while True:
-            line = lines.pop(0).strip()
-            if line.startswith(";ANSWER"):
-                break
-            answer_section.append(line)
-        message["ANSWER"] = answer_section
-
-        formatted_messages.append(message)
-
-    return formatted_messages
-
+    
 
 def print_pretty_dns(messages):
     for message in messages:
@@ -729,10 +693,6 @@ def print_pretty_dns(messages):
 
 
 def dns_answerParser(dns_message):
-    """
-    terminal RR Types as requested RRType.
-    """
-
     dns_response_data = dns_message.to_wire()
     dns_response = dns.message.from_wire(dns_response_data)
 
@@ -781,7 +741,7 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
     """
 
     if odohhost and not validators.url(odohhost):
-        print(f"{odohhost} is a valid url.")
+        print(f"{odohhost} is NOT in valid url format.")
         return
 
     # Step1 Service Discovery Method selection
@@ -790,8 +750,6 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
             odoh_ddr = 'https://odoh.cloudflare-dns.com/.well-known/odohconfigs'
         response = Fetch_Configs(odoh_ddr, v)
         odohhost = 'https://odoh.cloudflare-dns.com/dns-query'
-    
-    # to do add odohhost validation.
 
     elif configFetch_method.upper() == "DNS":
         response,  odohhost= SVCB_DNS_Request(odoh_ddr, resolver, ddrRType, v)
