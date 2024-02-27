@@ -719,8 +719,8 @@ def dns_answerParser(dns_message):
     for additional in dns_response.additional:
         print(additional)
 
-    dns_answer = ((dns_message.answer)[0]).to_text().split("\n")
-    if dns_answer:
+    if dns_message.answer:
+        dns_answer = ((dns_message.answer)[0]).to_text().split("\n")
         return dns_answer[0], rcode.to_text(dns_message.rcode())
 
     print(" -- No RRSET in Encrypted DNS response from ODOH server - [EMPTY DNS RESPONSE]")
