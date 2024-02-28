@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+
+
 import sys
 import odoh
 import argparse
 
-def main():
+
+if __name__ == '__main__':
 
     # python3 query.py --odohconfig url --target www.google.com --dnstype a
 
@@ -37,6 +41,7 @@ def main():
             sys.exit(1)
 
         dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose, args.getconfig)
+        print(dns_response)
 
     if args.odohconfig == 'URL':
         if (args.ddr or args.ddrtype):
@@ -44,8 +49,5 @@ def main():
             sys.exit(1)
 
         dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose, args.getconfig)
-
-if __name__ == "__main__":
-    main()
-
+        print(dns_response)
 

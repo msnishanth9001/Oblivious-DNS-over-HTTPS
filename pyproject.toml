@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "odoh"
+version = "3.0.0"
+description = "Oblivious DNS Over HTTPS"
+readme = "README.md"
+authors = [{ name = "M S Nishanth", email = "msnishanth9001@gmail.com" }]
+license = { file = "LICENSE" }
+keywords = ["odoh", "client", "Oblivious", "dns", "HTTPS"]
+dependencies = [
+    "python_version > 3.9",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.9"
+
+[project.urls]
+"Homepage" = "https://github.com/msnishanth9001/ObliviousDNS-over-HTTPS"
+"Bug Tracker" = "https://github.com/msnishanth9001/ObliviousDNS-over-HTTPS/issues"
