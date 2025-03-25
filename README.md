@@ -12,7 +12,9 @@ It currently supports the following functionalities:
 
 ## Installation
 
+```sh
 git clone https://github.com/msnishanth9001/Oblivious-DNS-over-HTTPS.git
+```
 
 ## Usage
 
