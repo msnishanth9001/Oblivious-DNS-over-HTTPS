@@ -4,9 +4,11 @@ ODoH allows hiding client IP addresses via proxying encrypted DNS transactions. 
 
 It currently supports the following functionalities:
 
-- [ ] DoH Query:
-- [x] ODoH Query:
-- [ ] ODoH Query via Proxy:
+- [x] ODoH Query where ODOH_CONFIG is from URL Server.
+- [x] ODoH Query where ODOH_CONFIG is via DNS SVCB Request.
+- [x] Fetch only the ODOH_CONFIG, from URL Server.
+- [x] Fetch only the ODOH_CONFIG, via DNS SVCB Request.
+- [ ] ODOH via Proxy forwader.
 
 ## Usage
 

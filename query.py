@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
-
 import sys
-import odoh
+from odoh import dns_odoh
 import argparse
 
-
-if __name__ == '__main__':
+def main():
 
     # python3 query.py --odohconfig url --target www.google.com --dnstype a
 
@@ -40,14 +38,15 @@ if __name__ == '__main__':
             print("Error ODOH-DNS method: Unsupported Arguments passed.")
             sys.exit(1)
 
-        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose, args.getconfig)
-        print(dns_response)
+        dns_odoh(args.ddr, args.odohconfig, args.ddrtype, args.ldns, args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose, args.getconfig)
 
     if args.odohconfig == 'URL':
         if (args.ddr or args.ddrtype):
             print("Error ODOH-URL method: Unsupported Arguments passed.")
             sys.exit(1)
 
-        dns_response = odoh.dns_odoh(args.ddr, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose, args.getconfig)
-        print(dns_response)
+        dns_odoh(args.ddr, args.odohconfig, '', '', args.odohhost, args.httpmethod, args.target, args.dnstype, args.verbose, args.getconfig)
+
+if __name__ == "__main__":
+    main()
 

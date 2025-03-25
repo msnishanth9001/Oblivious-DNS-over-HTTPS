@@ -95,7 +95,7 @@ def Fetch_Configs(url, v):
     """
 
     if v:
-        print(f" -- Fetch ODOH-Config from: {url}")
+        print(f"\n\n -- Fetch ODOH-Config from: {url}")
     response = requests.get(url)
     if response.status_code == 200:
         byte_data = response.content
@@ -120,7 +120,7 @@ def SVCB_DNS_Request(domain_name: str, resolver: str, ddrRType: dns.rdatatype, v
     dns.resolver.default_resolver.nameservers = [resolver]
 
     if v:
-        print(f" -- DNS domain Look up for {domain_name} with resolver {resolver} for rtype {ddrRType}")
+        print(f"\n\n -- DNS domain Look up for {domain_name} with resolver {resolver} for rtype {ddrRType}")
 
     # Create a DNS request for (SVCB/ HTTPS)
     qname = dns.name.from_text(domain_name)
@@ -132,8 +132,8 @@ def SVCB_DNS_Request(domain_name: str, resolver: str, ddrRType: dns.rdatatype, v
             dns_response = dns.resolver.resolve(qname, rdtype=dns.rdatatype.HTTPS)
         else:
             return None, None
-    except:
-        raise FailError(" -- SVCB Resolution Failed")
+    except Exception as e:
+        print(" -- SVCB Resolution Failed")
         return None, None
 
     answer = dns_response.rrset
@@ -743,7 +743,7 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
 
     if odohhost and not validators.url(odohhost):
         print(f"{odohhost} is NOT in valid url format.")
-        return
+        return 0
 
     # Step1 Service Discovery Method selection
     if configFetch_method.upper() == "URL":
@@ -768,7 +768,7 @@ def dns_odoh(odoh_ddr, configFetch_method, ddrRType, resolver, odohhost, http_me
 
     if odohconfigF:
         print("odohConfig:", ' '.join(str(byte) for byte in response))
-        return
+        return response
 
     # Step 2 parsing the ODoH Config
     try:
