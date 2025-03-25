@@ -10,12 +10,16 @@ It currently supports the following functionalities:
 - [x] Fetch only the ODOH_CONFIG, via DNS SVCB Request.
 - [ ] ODOH via Proxy forwader.
 
+## Installation
+
+git clone https://github.com/msnishanth9001/Oblivious-DNS-over-HTTPS.git
+
 ## Usage
 
-### ODoH query to target VIA DNS for odohConfig
+### Fetch ODoH configuration VIA URL
 
 ```sh
-python3 query.py --odohconfig dns --ldns 10.0.0.4 --ddr odoh.f5-dns.com --ddrtype svcb --target dns.answer.com --dnstype a -v
+python3 query.py --odohconfig url --target dns.answer.com --dnstype aaaa --getconfig -v
 ```
 
 ### ODoH query to target VIA URL for odohConfig
@@ -24,8 +28,14 @@ python3 query.py --odohconfig dns --ldns 10.0.0.4 --ddr odoh.f5-dns.com --ddrtyp
 python3 query.py --odohconfig url --target odoh.cloudflare-dns.com --dnstype aaaa
 ```
 
-### Fetch ODoH configuration
+### Fetch ODoH configuration VIA DNS SVCB
 
 ```sh
 python3 query.py --odohconfig dns --ldns 10.0.0.4 --ddr odoh.f5-dns.com --ddrtype svcb --target dns.answer.com --dnstype aaaa --getconfig -v
+```
+
+### ODoH query to target VIA DNS for odohConfig
+
+```sh
+python3 query.py --odohconfig dns --ldns 10.0.0.4 --ddr odoh.f5-dns.com --ddrtype svcb --target dns.answer.com --dnstype a -v
 ```
